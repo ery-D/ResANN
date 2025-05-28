@@ -10,3 +10,9 @@ For any questions and other requists please contact: n.li@catas.cn
 
 
 Environment: Python 3.9
+
+File folder description:
+The R Code folder contains the code for the machine learning models used in the comparison experiments
+The predict folder contains the code for the prediction model
+The model folder contains the pre-trained model files
+The inversion folder contains code for the inversion of water quality parameters
