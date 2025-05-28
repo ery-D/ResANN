@@ -1,0 +1,180 @@
+import pandas as pd
+from keras.layers import Input, Dense, BatchNormalization, ReLU, Add, Attention, Dropout, Activation
+from keras.models import Model
+from keras.optimizers import Adam
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from keras.models import Sequential
+from keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from keras.regularizers import l1_l2
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, explained_variance_score, max_error, \
+    mean_squared_log_error, median_absolute_error
+import numpy as np
+from keras import backend as K
+import tensorflow as tf
+import matplotlib.pyplot as plt
+import joblib
+from datetime import datetime
+####1.数据处理
+# 读取Excel数据并进行预处理
+df = pd.read_excel('ToTalNdata.xlsx')
+# df = df.drop(df.index[0])  # 假设第一行为表头
+X = df.iloc[:, 1:].values  # 自变量
+y = df.iloc[:, 0].values  # 因变量
+# 数据划分
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+# 特征归一化
+# scaler = MinMaxScaler()
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+####2.建模与训练
+# 定义残差块
+'''
+# 之前定义的残差块
+def residual_block(x, units):
+    y = Dense(units)(x)
+    y = Activation('relu')(y)
+    y = Dense(units)(y)
+    out = Add()([x, y])
+    out = Activation('relu')(out)
+    return out
+'''
+# 定义的残差块
+def residual_block(x, units):
+    y = Dense(units, activation='relu', kernel_regularizer=l1_l2(l1=1e-5, l2=1e-4))(x)
+    y = Dense(units, activation='relu', kernel_regularizer=l1_l2(l1=1e-5, l2=1e-4))(y)
+    out = Add()([x, y])
+    out = Activation('relu')(out)
+    return out
+
+# 定义的损失函数
+def adjusted_mean_squared_error(y_true, y_pred):
+    # 定义权重
+    weights = 1.2 * tf.exp(y_true / tf.reduce_max(y_true))
+    # 计算加权MSE
+    weighted_mse = tf.reduce_mean(weights * tf.square(y_true - y_pred))
+    # 添加L2正则化项
+    l2 = 0.01  # 正则化系数
+    l2_loss = tf.add_n([tf.nn.l2_loss(v) for v in model.trainable_variables])
+    # 结合加权MSE和L2正则化
+    total_loss = weighted_mse + l2 * l2_loss
+    return total_loss
+
+# 定义模型构建函数
+def build_model(input_shape, units, dropout_rate):
+    inputs = Input(shape=(input_shape,))
+    x = Dense(units, activation='relu')(inputs)
+    x = residual_block(x, units)
+    x = Dropout(dropout_rate)(x)
+    x = residual_block(x, units)
+    x = Dropout(dropout_rate)(x)
+    outputs = Dense(1, activation='linear')(x)
+    model = Model(inputs=inputs, outputs=outputs)
+    model.compile(loss=adjusted_mean_squared_error, optimizer=Adam(learning_rate=0.0005))
+    return model
+
+# 构建和训练模型
+model = build_model(X_train_scaled.shape[1], units=64, dropout_rate=0.1)
+early_stopping_monitor = EarlyStopping(patience=20)  # 使用早期停止以避免过拟合
+model.fit(X_train_scaled, y_train, validation_split=0.1, epochs=100, batch_size=32, verbose=0,
+          callbacks=[early_stopping_monitor])
+# verbose=0：不在标准输出流中输出日志信息。verbose=1：输出进度条记录。verbose=2：为每个 epoch 输出一行记录。
+
+####3.模型训练评估
+y_train_pred = model.predict(X_train_scaled)
+# 计算指标
+mse_train = mean_squared_error(y_train, y_train_pred)
+r2_train = r2_score(y_train, y_train_pred)
+mae_train = mean_absolute_error(y_train, y_train_pred)
+explained_variance_train = explained_variance_score(y_train, y_train_pred)
+max_error_value_train = max_error(y_train, y_train_pred)
+msle_train = mean_squared_log_error(y_train, y_train_pred)
+median_ae_train = median_absolute_error(y_train, y_train_pred)
+mape_train = np.mean(np.abs((y_train - y_train_pred) / y_train)) * 100
+# 打印评估指标
+print(f'Train MSE: {mse_train}')
+print(f'Train R2: {r2_train}')
+print(f'Train MAE: {mae_train}')
+print(f'Train Explained Variance Score: {explained_variance_train}')
+print(f'Train Max Error: {max_error_value_train}')
+print(f'Train Mean Squared Logarithmic Error: {msle_train}')
+print(f'Train Median Absolute Error: {median_ae_train}')
+print(f'Train MAPE: {mape_train}%')
+
+####4.模型测试评估
+y_test_pred = model.predict(X_test_scaled)
+# 计算指标
+mse_test = mean_squared_error(y_test, y_test_pred)
+r2_test = r2_score(y_test, y_test_pred)
+mae_test = mean_absolute_error(y_test, y_test_pred)
+explained_variance_test = explained_variance_score(y_test, y_test_pred)
+max_error_value_test = max_error(y_test, y_test_pred)
+msle_test = mean_squared_log_error(y_test, y_test_pred)
+median_ae_test = median_absolute_error(y_test, y_test_pred)
+mape_test = np.mean(np.abs((y_test - y_test_pred) / y_test)) * 100
+'''
+Mean Squared Error (MSE)：均方误差是衡量模型预测值与实际观测值之间差异的常用指标。它是各数据点预测误差平方和的平均值。误差越小，MSE就越小，表示模型的预测准确性越高。MSE对较大的误差赋予了更大的权重，因为误差是被平方的。
+R-squared (R2)：R2指标是决定系数，衡量模型预测的可决方差的比例。它是在回归分析中用于确定模型拟合好坏的统计量。R2的值介于0到1之间，值越接近1，表示模型解释的变异性越高。
+Mean Absolute Error (MAE)：平均绝对误差是另一种衡量模型预测精确度的方法，它计算的是预测值与实际值之间差的绝对值的平均值。与MSE相比，MAE对大的误差没有那么敏感，因为它不涉及平方。
+Explained Variance Score：解释方差分数衡量我们的模型对数据集方差的解释能力。如果该分数为1，则表示我们的模型完美地解释了数据的所有变异性。如果分数较低，模型未能捕捉到数据的某些重要特征。
+Max Error：最大误差是预测值与实际值之差的最大值。这提供了在最坏情况下模型可能的最大预测误差，是评估模型极端值性能的一种方式。
+Mean Squared Logarithmic Error (MSLE)：均方对数误差是预测值和实际值对数之差的平方的平均值。它主要用于处理具有指数（或长尾）分布的数据。由于对数转换，预测值与目标值之间较小的差异会被放大，而较大的差异则会被缩小。
+Median Absolute Error：中位数绝对误差是所有绝对误差的中位数，对异常值不敏感，提供了另一种误差度量方式。
+Mean Absolute Percentage Error (MAPE)：平均绝对百分比误差是预测误差的绝对值与实际值的比例的平均值，表达为百分比，提供了误差的相对大小。
+'''
+# 打印评估指标
+print(f'Test MSE: {mse_test}')
+print(f'Test R2: {r2_test}')
+print(f'Test MAE: {mae_test}')
+print(f'Test Explained Variance Score: {explained_variance_test}')
+print(f'Test Max Error: {max_error_value_test}')
+print(f'Test Mean Squared Logarithmic Error: {msle_test}')
+print(f'Test Median Absolute Error: {median_ae_test}')
+print(f'Test MAPE: {mape_test}%')
+
+####5.保存模型和归一化参数
+now = datetime.now()
+time_str = now.strftime("%m-%d_%H-%M-%S")
+joblib.dump(scaler, 'scaler_TN.save')
+model.save(r'my_model_' + time_str +'.h5')
+print("模型已保存为 my_model")
+print("模型已保存为 model.h5")
+
+####6.画出散点图
+y_train_actual = [y_train]
+y_test_actual = [y_test]
+# 确保所有数据都是一维的
+y_train_actual = np.array(y_train_actual).flatten()
+y_train_pred = np.array(y_train_pred).flatten()
+y_test_actual = np.array(y_test_actual).flatten()
+y_test_pred = np.array(y_test_pred).flatten()
+# 使用最小二乘法计算拟合线的斜率和截距
+slope_train, intercept_train = np.polyfit(y_train_actual, y_train_pred, 1)
+slope_test, intercept_test = np.polyfit(y_test_actual, y_test_pred, 1)
+# 创建图像
+plt.figure(figsize=(12, 6))
+# 绘制训练集的点、拟合线和 y=x 线
+plt.subplot(1, 2, 1)
+plt.scatter(y_train_actual, y_train_pred, color='blue', label='Train')
+plt.plot(y_train_actual, intercept_train + slope_train * y_train_actual, 'r-',label=f'Fit Line (Slope: {slope_train:.2f})')
+plt.plot([np.min(y_train_actual), np.max(y_train_actual)], [np.min(y_train_actual), np.max(y_train_actual)], 'k--',lw=2, label='y=x line')
+plt.text(0.02, 0.8, f'Train: $R^2$={r2_train:.2f} MSE={mse_train:.2f}', transform=plt.gca().transAxes)
+
+plt.subplot(1, 2, 2)
+plt.scatter(y_test_actual, y_test_pred, color='orange', label='Test')
+plt.plot(y_test_actual, intercept_test + slope_test * y_test_actual, 'r-', label=f'Fit Line (Slope: {slope_test:.2f})')
+plt.plot([np.min(y_test_actual), np.max(y_test_actual)], [np.min(y_test_actual), np.max(y_test_actual)], 'k--', lw=2,label='y=x line')
+plt.text(0.02, 0.8, f'Test: $R^2$={r2_test:.2f} MSE={mse_test:.2f}', transform=plt.gca().transAxes)
+# 添加图例和轴标签
+for i in [1, 2]:
+    plt.subplot(1, 2, i)
+    plt.legend()
+    plt.xlabel('TN measured')
+    plt.ylabel('TN predicted')
+plt.tight_layout()
+model_plot = f'1.png'
+plt.savefig(model_plot, dpi=300, bbox_inches='tight')
+plt.show()
