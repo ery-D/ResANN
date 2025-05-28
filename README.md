@@ -1,4 +1,4 @@
-# ResANN
+## ResANN
 Code used in the article "Impact of large-scale climate indices on total nitrogen concentrations in drinking water sources cannot be overlooked"
 
 Author: Ning Li, Zheng Zhang
