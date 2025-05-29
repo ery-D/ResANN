@@ -16,7 +16,7 @@ For any questions and other requists please contact: n.li@catas.cn
 Python 3.9
 
 ## Description
-### R Code folder 
+### Fine-tuned models folder 
 contains the code for the machine learning models used in the comparison experiments.<br>
 ### predict folder 
 contains the code for the prediction model.<br>
